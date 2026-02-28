@@ -1,11 +1,11 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
+from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 import asyncio
 
-from backend.services.gemini_client import GeminiClient
+from backend.services.claude_client import ClaudeClient
 from backend.services.session_manager import SessionManager
 from backend.services.code_validator import CodeValidator
 from backend.services.manim_executor import ManimExecutor
@@ -15,26 +15,23 @@ from backend.models.schemas import AnimationPlan, ManimCode
 
 app = FastAPI(title="Manim Animation Generator")
 
-# CORS
+# CORS - Very permissive configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://localhost:5173"
-    ],  # Next.js and Vite ports
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins for development
+    allow_credentials=False,  # Disable credentials to be more permissive
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Initialize services
-gemini_client = GeminiClient()
+claude_client = ClaudeClient()
 session_manager = SessionManager()
 code_validator = CodeValidator()
 manim_executor = ManimExecutor()
-planning_agent = PlanningAgent(gemini_client)
-code_generator = CodeGenerator(gemini_client)
+planning_agent = PlanningAgent(claude_client)
+code_generator = CodeGenerator(claude_client)
 
 # Request/Response models
 class CreateAnimationRequest(BaseModel):

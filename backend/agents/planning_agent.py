@@ -1,9 +1,9 @@
-from backend.services.gemini_client import GeminiClient
+from backend.services.claude_client import ClaudeClient
 from backend.models.schemas import AnimationPlan
 
 class PlanningAgent:
-    def __init__(self, gemini_client: GeminiClient):
-        self.client = gemini_client
+    def __init__(self, claude_client: ClaudeClient):
+        self.client = claude_client
         self.system_instruction = """You are an expert Manim animation planner.
 
 Your job is to create detailed, structured plans for mathematical and educational animations.
@@ -50,7 +50,8 @@ Make it educational, visually appealing, and well-paced."""
             prompt=prompt,
             schema=AnimationPlan,
             system_instruction=self.system_instruction,
-            temperature=1.0
+            temperature=self.client.planning_temperature,
+            max_tokens=self.client.planning_max_tokens,
         )
         
         return plan
@@ -78,7 +79,8 @@ Return the updated complete plan."""
         updated_plan = await self.client.chat_multi_turn(
             messages=messages,
             system_instruction=self.system_instruction,
-            schema=AnimationPlan
+            schema=AnimationPlan,
+            max_tokens=self.client.chat_max_tokens,
         )
         
         return updated_plan

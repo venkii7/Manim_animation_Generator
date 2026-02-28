@@ -1,14 +1,27 @@
-from backend.services.gemini_client import GeminiClient
+from backend.services.claude_client import ClaudeClient
 from backend.models.schemas import AnimationPlan, ManimCode
 
 class CodeGenerator:
-    def __init__(self, gemini_client: GeminiClient):
-        self.client = gemini_client
-        self.system_instruction = """You are an expert Manim code generator.
+    def __init__(self, claude_client: ClaudeClient):
+        self.client = claude_client
+        self.system_instruction = """You are an expert Manim code generator that outputs valid JSON.
 
-Generate clean, executable Python code using Manim Community Edition v0.18+.
+CRITICAL JSON OUTPUT RULES:
+1. You MUST output valid JSON with properly escaped strings
+2. The "code" field contains Python code as a JSON string - ALL special characters must be escaped:
+   - Backslashes: \\ (use double backslash)
+   - Quotes: \" (escape quotes)
+   - Newlines: \\n (use newline escape)
+3. Python raw strings like r"..." should be written as plain strings in JSON with proper escaping
+4. Example JSON output:
+   {
+     "code": "from manim import *\\n\\nclass MyScene(Scene):\\n    def construct(self):\\n        formula = MathTex(r\\"\\\\\\\\frac{a}{b}\\")\\n        self.play(Create(formula))",
+     "scene_class_name": "MyScene",
+     "imports": ["from manim import *", "import numpy as np"],
+     "explanation": "Creates a fraction animation"
+   }
 
-CRITICAL RULES:
+MANIM CODE GENERATION RULES:
 1. ALL LaTeX strings in Python MUST use raw strings (r"") or properly escape backslashes
 2. Example: MathTex(r"\\vec{A}") or MathTex("\\\\vec{A}")
 3. NEVER use single backslash in regular strings
@@ -45,8 +58,7 @@ Guidelines:
 - Follow PEP 8 style guidelines
 - Keep code simple and readable
 
-Example structure:
-```python
+Example structure (do NOT wrap in code fences - output plain Python in the JSON string):
 from manim import *
 import numpy as np
 
@@ -61,7 +73,8 @@ class MyScene(Scene):
         self.wait(0.5)
         self.play(FadeIn(formula))
         self.wait(1)
-```"""
+
+The "code" JSON field must contain ONLY the raw Python source — never wrap it in ```python ... ``` fences."""
 
     async def generate_code(self, plan: AnimationPlan) -> ManimCode:
         """Generate Manim code from animation plan."""
@@ -77,12 +90,19 @@ Objects:
 Timeline:
 {self._format_timeline(plan.timeline)}
 
+IMPORTANT: Output valid JSON with these fields:
+- "code": Complete Python code as a properly escaped JSON string
+- "scene_class_name": Name of the main Scene class
+- "imports": Array of import statements
+- "explanation": Brief description of the code
+
 Generate clean, working Manim code that:
 1. Creates all objects with specified properties
 2. Follows the timeline exactly
 3. Uses proper Manim animations
 4. Includes all necessary imports
 5. Has clear comments
+6. Uses raw strings for LaTeX: r"\\frac{a}{b}"
 
 The code should be production-ready and executable."""
 
@@ -90,11 +110,28 @@ The code should be production-ready and executable."""
             prompt=prompt,
             schema=ManimCode,
             system_instruction=self.system_instruction,
-            temperature=0.7  # Slightly lower for code generation
+            temperature=self.client.code_temperature,
+            max_tokens=self.client.code_max_tokens,
         )
-        
+
+        # Strip any markdown code fences the model may have wrapped around the code
+        code.code = self._clean_code(code.code)
         return code
     
+    def _clean_code(self, code: str) -> str:
+        """Strip markdown code fences and leading/trailing whitespace from generated code."""
+        code = code.strip()
+        # Remove ```python ... ``` or ``` ... ``` wrappers
+        if code.startswith("```"):
+            lines = code.splitlines()
+            # Drop the first line (``` or ```python)
+            lines = lines[1:]
+            # Drop the last closing ``` if present
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            code = "\n".join(lines).strip()
+        return code
+
     def _format_objects(self, objects) -> str:
         """Format objects for prompt."""
         lines = []
