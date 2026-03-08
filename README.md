@@ -1,6 +1,6 @@
 # Manim Animation Generator
 
-AI-powered tool to generate Manim animations using Gemini Flash 2.5.
+AI-powered tool to generate Manim animations using Claude.
 
 ## Features
 
