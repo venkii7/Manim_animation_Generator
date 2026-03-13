@@ -128,7 +128,7 @@ storage/
 
 ## Workflow Stages
 
-1. **Input** - User provides animation description
+1. **Input** - *User provides animation description*
 2. **Planning** - AI generates structured plan (JSON)
 3. **Plan Ready** - User can review/edit/regenerate plan
 4. **Code Generating** - AI generates Manim Python code
